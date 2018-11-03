@@ -1,12 +1,16 @@
-var express     = require("express"),
-    bodyParser  = require("body-parser"),
-    mongoose    = require("mongoose"),
-    app         = express();
+var express           = require("express"),
+    methodOverride    = require("method-override"),
+    expressSanitizer  = require("express-sanitizer"),
+    bodyParser        = require("body-parser"),
+    mongoose          = require("mongoose"),
+    app               = express();
 
 // Initial setups
-app.set("view engine", "ejs");
+app.set("view engine", "ejs");                          
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({extended: true}));
+app.use(expressSanitizer());                           // Must go after body-parser
+app.use(methodOverride("_method"));                    // Can be anything but typically "_method"
 
 //Connect to MongoDB
 mongoose.connect("mongodb://localhost/blogApp", { useNewUrlParser: true }, function(err, db){
@@ -57,13 +61,10 @@ app.get("/blogs/new", function(req, res){
   res.render("new");
 });
 
-app.listen(process.env.PORT || 3000, function(){
-  console.log("Server Started");           
-})
-    
 //CREATE ROUTE
 app.post("/blogs", function(req, res){
   //Create BLOG
+  req.body.blog.body = req.sanitize(req.body.blog.body);                 // Sanitize Input
   Blog.create(req.body.blog, function(err, newBlog){                     //Blog.create(data, callback)
     if (err) {
       console.log("Error!");
@@ -73,5 +74,58 @@ app.post("/blogs", function(req, res){
       res.redirect("/blogs");
     }
   })    
-  
 });
+
+//SHOW ROUTE
+app.get("/blogs/:id", function(req, res){
+  Blog.findById(req.params.id, function(err, foundBlog){
+    if (err) {
+      console.log("Error!");
+      res.redirect("/blogs");
+    } else {
+      res.render("show", {blog: foundBlog});
+    }
+  })
+})
+
+//EDIT ROUTE -- SUBMIT to correct URL AND PREFILL WITH CORRECT DATA
+app.get("/blogs/:id/edit", function(req, res){
+  Blog.findById(req.params.id, function(err, foundBlog){
+    if (err) {
+      console.log("Error!");
+      res.redirect("/blogs");
+    } else {
+      res.render("edit", {blog: foundBlog});
+    }
+  })
+})
+
+//UPDATE ROUTE
+app.put("/blogs/:id", function(req, res){
+  req.body.blog.body = req.sanitize(req.body.blog.body);                 // Sanitize Input
+  Blog.findByIdAndUpdate(req.params.id, req.body.blog, function(err, updatedBlog){
+    if (err) {
+      console.log("Error!");
+      res.redirect("/blogs");
+    } else {
+      res.redirect("/blogs/"+req.params.id);
+    }
+  })
+})
+
+//DESTROY ROUTE
+app.delete("/blogs/:id", function(req, res){
+  Blog.findByIdAndRemove(req.params.id, function(err){
+    if (err) {
+      res.redirect("/blogs");
+    } else {
+      res.redirect("/blogs");
+    }
+  })
+})
+
+app.listen(process.env.PORT || 3000, function(){
+  console.log("Server Started");           
+})
+    
+
